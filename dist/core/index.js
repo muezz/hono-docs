@@ -2702,7 +2702,6 @@ async function runGenerate(configPath, options = {}) {
       json.paths
     )) {
       const prefixedPath = path3.posix.join(normalizedPrefix, pathKey).replace(/\/+$/, "") || "/";
-      if (!merged.paths[prefixedPath]) merged.paths[prefixedPath] = {};
       for (const [method, opVal] of Object.entries(operations)) {
         const operation = opVal;
         const opKey = `${method.toLowerCase()} ${prefixedPath}`;
@@ -2721,7 +2720,12 @@ async function runGenerate(configPath, options = {}) {
           }
         }
         cleanDefaultResponse(operation);
-        merged.paths[prefixedPath][method] = operation;
+        const finalOperation = config.transformOperation ? config.transformOperation(operation, {
+          path: prefixedPath,
+          method
+        }) : operation;
+        if (!finalOperation) continue;
+        (merged.paths[prefixedPath] ??= {})[method] = finalOperation;
       }
     }
   }
@@ -2737,10 +2741,11 @@ async function runGenerate(configPath, options = {}) {
   const deduplicatedSpec = deduplicateComponents(
     finalSpec
   );
+  const spec = config.transformDocument ? config.transformDocument(deduplicatedSpec) : deduplicatedSpec;
   if (config.validateOutput !== false) {
     try {
       const SwaggerParser = await import("@apidevtools/swagger-parser");
-      const clonedSpec = JSON.parse(JSON.stringify(deduplicatedSpec));
+      const clonedSpec = JSON.parse(JSON.stringify(spec));
       await SwaggerParser.default.validate(clonedSpec);
     } catch (err) {
       logger.warn(
@@ -2753,7 +2758,7 @@ ${err.message}`
   let validationFailed = false;
   if (config.outputs.openApiJson) {
     const jsonPath = path3.join(rootPath, config.outputs.openApiJson);
-    const specContent = `${JSON.stringify(deduplicatedSpec, null, 2)}
+    const specContent = `${JSON.stringify(spec, null, 2)}
 `;
     if (options.validate) {
       const existing = fs3.existsSync(jsonPath) ? fs3.readFileSync(jsonPath, "utf-8") : null;
@@ -2772,7 +2777,7 @@ ${err.message}`
   let yamlSize;
   if (config.outputs.openApiYaml) {
     const yamlPath = path3.join(rootPath, config.outputs.openApiYaml);
-    const yamlContent = yaml.stringify(deduplicatedSpec);
+    const yamlContent = yaml.stringify(spec);
     if (options.validate) {
       const existing = fs3.existsSync(yamlPath) ? fs3.readFileSync(yamlPath, "utf-8") : null;
       if (existing !== yamlContent) {

@@ -1,9 +1,12 @@
 import { Project } from 'ts-morph';
 import { OpenAPIV3 } from 'openapi-types';
 
+declare const HONO_METHOD_NAMES: readonly ["get", "post", "put", "patch", "delete", "options", "head", "all"];
 declare const VALIDATOR_TARGETS: readonly ["json", "form", "query", "param", "header", "cookie"];
 declare const VALIDATOR_LIBRARIES: readonly ["zod", "valibot", "typebox", "yup", "arktype", "unsupported"];
 
+/** Supported lowercase Hono HTTP methods */
+type HonoMethod = (typeof HONO_METHOD_NAMES)[number];
 /**
  * The base OpenAPI configuration, excluding dynamically generated fields.
  *
@@ -111,6 +114,19 @@ type HonoDocsConfig = {
      * @example { Users: { description: "User management" } }
      */
     tags?: Record<string, Omit<OpenAPIV3.TagObject, "name">>;
+    /**
+     * Transforms each operation after tags are applied. Return `null` to exclude it.
+     * `path` is the endpoint's final path (e.g. `/api/users/{id}`).
+     */
+    transformOperation?: (operation: OpenAPIV3.OperationObject, context: {
+        path: string;
+        method: HonoMethod;
+    }) => OpenAPIV3.OperationObject | null;
+    /**
+     * Transforms the final document before validation and writing,
+     * e.g. to add `components.securitySchemes`.
+     */
+    transformDocument?: (spec: OpenAPIV3.Document) => OpenAPIV3.Document;
     /**
      * Whether to run the generated OpenAPI spec through a structural validator before output.
      * Prints warnings for any spec violations (e.g. invalid status codes, broken refs).
