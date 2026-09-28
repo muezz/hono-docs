@@ -6,7 +6,7 @@ import { Project } from "ts-morph";
 import { loadConfig } from "../config/loadConfig";
 import { generateTypes } from "./generateTypes";
 import { generateOpenApi } from "./generateOpenApi";
-import { Api } from "../types";
+import type { Api, HonoMethod } from "../types";
 import { cleanDefaultResponse, sanitizeApiPrefix } from "../utils/format";
 import { getLibDir } from "../utils/libDir";
 import { logger } from "../utils/logger";
@@ -283,7 +283,6 @@ export async function runGenerate(
     )) {
       const prefixedPath =
         path.posix.join(normalizedPrefix, pathKey).replace(/\/+$/, "") || "/";
-      if (!merged.paths[prefixedPath]) merged.paths[prefixedPath] = {};
 
       for (const [method, opVal] of Object.entries(operations)) {
         const operation =
@@ -311,12 +310,21 @@ export async function runGenerate(
         }
 
         cleanDefaultResponse(operation);
+
+        const finalOperation = config.transformOperation
+          ? config.transformOperation(operation, {
+              path: prefixedPath,
+              method: method as HonoMethod,
+            })
+          : operation;
+        if (!finalOperation) continue;
+
         (
-          merged.paths[prefixedPath] as Record<
+          (merged.paths[prefixedPath] ??= {}) as Record<
             string,
             import("openapi-types").OpenAPIV3.OperationObject
           >
-        )[method] = operation;
+        )[method] = finalOperation;
       }
     }
   }
@@ -336,12 +344,15 @@ export async function runGenerate(
   const deduplicatedSpec = deduplicateComponents(
     finalSpec as unknown as import("openapi-types").OpenAPIV3.Document,
   );
+  const spec = config.transformDocument
+    ? config.transformDocument(deduplicatedSpec)
+    : deduplicatedSpec;
 
   
   if (config.validateOutput !== false) {
     try {
       const SwaggerParser = await import("@apidevtools/swagger-parser");
-      const clonedSpec = JSON.parse(JSON.stringify(deduplicatedSpec));
+      const clonedSpec = JSON.parse(JSON.stringify(spec));
       
       await SwaggerParser.default.validate(clonedSpec);
     } catch (err) {
@@ -356,7 +367,7 @@ export async function runGenerate(
 
   if (config.outputs.openApiJson) {
     const jsonPath = path.join(rootPath, config.outputs.openApiJson);
-    const specContent = `${JSON.stringify(deduplicatedSpec, null, 2)}\n`;
+    const specContent = `${JSON.stringify(spec, null, 2)}\n`;
 
     if (options.validate) {
       const existing = fs.existsSync(jsonPath)
@@ -378,7 +389,7 @@ export async function runGenerate(
   let yamlSize: number | undefined;
   if (config.outputs.openApiYaml) {
     const yamlPath = path.join(rootPath, config.outputs.openApiYaml);
-    const yamlContent = yaml.stringify(deduplicatedSpec);
+    const yamlContent = yaml.stringify(spec);
 
     if (options.validate) {
       const existing = fs.existsSync(yamlPath)

@@ -415,6 +415,8 @@ All options live in your `defineConfig({ ... })` call:
 | &nbsp;&nbsp;└ `tag`         | `string[]`                                                                        | —        | Tags for grouping in the sidebar                                                                                                    |
 | `tagResolver`               | `(path: string) => string \| undefined`                                           | —        | Derives a tag from an endpoint's final path. A returned tag replaces JSDoc `@tag` and group name tags.                              |
 | `tags`                      | `Record<string, Omit<TagObject, "name">>`                                         | —        | Tag metadata (`description`, `externalDocs`) keyed by tag name, emitted in the top-level `tags`.                                    |
+| `transformOperation`        | `(operation, { path, method }) => OperationObject \| null`                        | —        | Transforms each operation after tags are applied. Return `null` to exclude it.                                                      |
+| `transformDocument`         | `(spec: Document) => Document`                                                    | —        | Transforms the final document before validation and writing.                                                                        |
 | `preDefineTypeContent`      | `string`                                                                          | —        | Content injected at the top of generated `.d.ts` snapshots (e.g. `import { Env } from './types';`) to resolve missing global types. |
 
 ### Tags from Paths
@@ -436,6 +438,32 @@ export default defineConfig({
 ```
 
 When `tagResolver` returns `undefined`, the endpoint falls back to its JSDoc `@tag` and group name.
+
+### Transforming the Output
+
+`transformOperation` runs on every operation, and `transformDocument` runs on the final document before it is validated and written:
+
+```ts
+export default defineConfig({
+  // ...
+  transformOperation: (operation, { path, method }) => {
+    if (path.startsWith("/api/internal")) return null; // exclude
+    if (operation.responses.default) {
+      operation.responses["200"] = operation.responses.default;
+      delete operation.responses.default;
+    }
+    return operation;
+  },
+  transformDocument: (spec) => ({
+    ...spec,
+    components: {
+      ...spec.components,
+      securitySchemes: { bearer: { type: "http", scheme: "bearer" } },
+    },
+    security: [{ bearer: [] }],
+  }),
+});
+```
 
 ---
 
