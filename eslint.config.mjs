@@ -12,6 +12,7 @@ export default defineConfig([
       "tsup.config.ts",
       "examples/",
       "scratch/",
+      "tests/",
       "temp/",
       "**/temp/",
     ],
