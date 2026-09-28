@@ -413,7 +413,29 @@ All options live in your `defineConfig({ ... })` call:
 | &nbsp;&nbsp;└ `summary`     | `string`                                                                          | —        | Short summary shown in docs                                                                                                         |
 | &nbsp;&nbsp;└ `description` | `string`                                                                          | —        | Longer endpoint description                                                                                                         |
 | &nbsp;&nbsp;└ `tag`         | `string[]`                                                                        | —        | Tags for grouping in the sidebar                                                                                                    |
+| `tagResolver`               | `(path: string) => string \| undefined`                                           | —        | Derives a tag from an endpoint's final path. A returned tag replaces JSDoc `@tag` and group name tags.                              |
+| `tags`                      | `Record<string, Omit<TagObject, "name">>`                                         | —        | Tag metadata (`description`, `externalDocs`) keyed by tag name, emitted in the top-level `tags`.                                    |
 | `preDefineTypeContent`      | `string`                                                                          | —        | Content injected at the top of generated `.d.ts` snapshots (e.g. `import { Env } from './types';`) to resolve missing global types. |
+
+### Tags from Paths
+
+Use `tagResolver` to tag endpoints by path instead of annotating each route, and `tags` to describe them:
+
+```ts
+export default defineConfig({
+  // ...
+  tagResolver: (path) => path.split("/")[2], // "/api/users/{id}" → "users"
+  tags: {
+    users: { description: "User management" },
+    orders: {
+      description: "Order lifecycle",
+      externalDocs: { url: "https://example.com/orders" },
+    },
+  },
+});
+```
+
+When `tagResolver` returns `undefined`, the endpoint falls back to its JSDoc `@tag` and group name.
 
 ---
 

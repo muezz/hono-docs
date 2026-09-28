@@ -237,7 +237,7 @@ export async function runGenerate(
   const merged = {
     security: [],
     ...config.openApi,
-    tags: [] as { name: string }[],
+    tags: [] as import("openapi-types").OpenAPIV3.TagObject[],
     components: { schemas: {} },
     paths: {} as Record<
       string,
@@ -290,6 +290,7 @@ export async function runGenerate(
           opVal as import("openapi-types").OpenAPIV3.OperationObject;
         const opKey = `${method.toLowerCase()} ${prefixedPath}`;
         const customApi = customApiMap.get(opKey);
+        const resolvedTag = config.tagResolver?.(prefixedPath);
 
         // Override or enrich metadata if defined
         if (customApi) {
@@ -299,7 +300,9 @@ export async function runGenerate(
           operation.tags =
             customApi.tag && customApi.tag.length > 0
               ? customApi.tag
-              : [apiGroup.name];
+              : [resolvedTag || apiGroup.name];
+        } else if (resolvedTag) {
+          operation.tags = [resolvedTag];
         } else {
           operation.tags = operation.tags || [];
           if (!operation.tags.includes(apiGroup.name)) {
@@ -316,6 +319,12 @@ export async function runGenerate(
         )[method] = operation;
       }
     }
+  }
+
+  for (const [name, meta] of Object.entries(config.tags ?? {})) {
+    const existing = merged.tags.find((t) => t.name === name);
+    if (existing) Object.assign(existing, meta);
+    else merged.tags.push({ name, ...meta });
   }
 
   // Apply version-specific document root fields (e.g. $schema for 3.1)

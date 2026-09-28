@@ -128,6 +128,20 @@ export type HonoDocsConfig = {
   apis: ApiGroup[];
 
   /**
+   * Derives a tag from an endpoint's final path (e.g. `/api/users/{id}`).
+   * Returning a tag replaces the JSDoc `@tag` and group name tags;
+   * returning `undefined` keeps them.
+   */
+  tagResolver?: (path: string) => string | undefined;
+
+  /**
+   * Metadata for tags, keyed by tag name, emitted in the document's top-level `tags`.
+   *
+   * @example { Users: { description: "User management" } }
+   */
+  tags?: Record<string, Omit<OpenAPIV3.TagObject, "name">>;
+
+  /**
    * Whether to run the generated OpenAPI spec through a structural validator before output.
    * Prints warnings for any spec violations (e.g. invalid status codes, broken refs).
    * @default true
